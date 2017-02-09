@@ -5,10 +5,11 @@ import {AppToken as AppTokenV2, getAppToken as getAppTokenV2} from './auth_v2'
 import * as auth from './auth_v3'
 import * as crud from './crud'
 import * as mango from './mango'
-import * as files from './files'
 import * as offline from './offline'
 import * as settings from './settings'
 import * as relations from './relations'
+import FilesAPI from './files'
+import SettingsAPI from './settings'
 
 const {
   AppToken: AppTokenV3,
@@ -49,25 +50,6 @@ const authProto = {
   getAuthCodeURL: auth.getAuthCodeURL,
   getAccessToken: auth.getAccessToken,
   refreshToken: auth.refreshToken
-}
-
-const filesProto = {
-  create: files.create,
-  createDirectory: files.createDirectory,
-  updateById: files.updateById,
-  updateAttributesById: files.updateAttributesById,
-  updateAttributesByPath: files.updateAttributesByPath,
-  trashById: files.trashById,
-  statById: files.statById,
-  statByPath: files.statByPath,
-  downloadById: files.downloadById,
-  downloadByPath: files.downloadByPath,
-  getDowloadLink: files.getDowloadLink,
-  getArchiveLink: files.getArchiveLink,
-  listTrash: files.listTrash,
-  clearTrash: files.clearTrash,
-  restoreById: files.restoreById,
-  destroyById: files.destroyById
 }
 
 const offlineProto = {
@@ -145,9 +127,11 @@ class Cozy {
     const disablePromises = !!options.disablePromises
     addToProto(this, this, mainProto, disablePromises)
     addToProto(this, this.auth, authProto, disablePromises)
-    addToProto(this, this.files, filesProto, disablePromises)
     addToProto(this, this.offline, offlineProto, disablePromises)
     addToProto(this, this.settings, settingsProto, disablePromises)
+
+    this.files = new FilesAPI(this)
+    this.settings = new SettingsAPI(this)
 
     if (options.offline) {
       this.offline.init(options.offline)
