@@ -1,6 +1,6 @@
 /* global btoa */
-import {encodeQuery, decodeQuery} from './utils'
-import {cozyFetchJSON, FetchError} from './fetch'
+import {encodeQuery, decodeQuery} from '../utils'
+import {cozyFetchJSON, FetchError} from '../fetch'
 
 const StateSize = 16
 

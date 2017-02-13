@@ -3,6 +3,7 @@
 // eslint-disable-next-line no-unused-vars
 import should from 'should'
 import {Cozy} from '../../src'
+import mock from '../mock-api'
 import PouchDB from 'pouchdb'
 PouchDB.plugin(require('pouchdb-adapter-memory'))
 
@@ -14,12 +15,15 @@ describe('offline', () => {
   let cozy
 
   describe('Initialise offline', () => {
+    beforeEach(mock.mockAPI('Status'))
+    afterEach(() => mock.restore())
+
     it('is disable by default', () => {
       cozy = new Cozy({
         cozyURL: cozyUrl,
         token: 'apptoken'
       })
-      const isNotDefined = cozy._offline === null
+      const isNotDefined = cozy.offline._dbs === null
       isNotDefined.should.be.true
     })
 
@@ -29,11 +33,10 @@ describe('offline', () => {
         offline: offlineParameter,
         token: 'apptoken'
       })
-      cozy._offline.should.be.an.Array()
-      cozy._offline.should.have.property(fileDoctype)
-      cozy._offline.should.have.property(otherDoctype)
-      cozy._offline[fileDoctype].database.should.be.an.instanceof(PouchDB)
-      cozy._offline[otherDoctype].database.should.be.an.instanceof(PouchDB)
+      cozy.offline._dbs.should.have.property(fileDoctype)
+      cozy.offline._dbs.should.have.property(otherDoctype)
+      cozy.offline._dbs[fileDoctype].database.should.be.an.instanceof(PouchDB)
+      cozy.offline._dbs[otherDoctype].database.should.be.an.instanceof(PouchDB)
     })
 
     it('is possible to enable after cozy init', () => {
@@ -42,12 +45,14 @@ describe('offline', () => {
         token: 'apptoken'
       })
       cozy.offline.createDatabase(fileDoctype, {adapter: 'memory'})
-      cozy._offline.should.be.an.Array()
-      cozy._offline.should.have.property(fileDoctype)
+      cozy.offline._dbs.should.have.property(fileDoctype)
     })
   })
 
   describe('doctype database', () => {
+    beforeEach(mock.mockAPI('Status'))
+    afterEach(() => mock.restore())
+
     beforeEach(() => {
       cozy = new Cozy({
         cozyURL: cozyUrl,
@@ -101,6 +106,9 @@ describe('offline', () => {
   })
 
   describe('sync database', () => {
+    beforeEach(mock.mockAPI('Status'))
+    afterEach(() => mock.restore())
+
     beforeEach(() => {
       cozy = new Cozy({
         cozyURL: cozyUrl,

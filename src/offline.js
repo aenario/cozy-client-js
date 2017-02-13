@@ -4,132 +4,138 @@ import { DOCTYPE_FILES } from './doctypes'
 
 let pluginLoaded = false
 
-export function init (cozy, { options = {}, doctypes = [], timer = false }) {
-  for (let doctype of doctypes) {
-    createDatabase(cozy, doctype, options)
+export default class Offline {
+
+  constructor (cozy) {
+    this.cozy = cozy
+    this._dbs = {}
   }
-  if (timer) { startAllSync(cozy, timer) }
-}
 
-export function createDatabase (cozy, doctype, options = {}, timer = false) {
-  if (!pluginLoaded) {
-    PouchDB.plugin(pouchdbFind)
-    pluginLoaded = true
+  init ({ options = {}, doctypes = [], timer = false }) {
+    for (let doctype of doctypes) {
+      this.createDatabase(doctype, options)
+    }
+    if (timer) { this.startAllSync(timer) }
   }
-  cozy._offline = cozy._offline || []
-  cozy._offline[doctype] = cozy._offline[doctype] || {}
-  let offline = cozy._offline[doctype]
-  if (offline && offline.database) { return offline.database }
-  offline.database = new PouchDB(doctype, options)
-  offline.timer = timer
-  offline.autoSync = null
-  if (timer) { startSync(cozy, doctype, timer) }
-  createIndexes(cozy, offline.database, doctype)
-  return offline.database
-}
 
-export function hasDatabase (cozy, doctype) {
-  return cozy._offline !== null &&
-    doctype in cozy._offline &&
-    cozy._offline[doctype].database !== undefined
-}
-
-export function getDatabase (cozy, doctype) {
-  if (hasDatabase(cozy, doctype)) {
-    return cozy._offline[doctype].database
+  createDatabase (doctype, options = {}, timer = false) {
+    if (!pluginLoaded) {
+      PouchDB.plugin(pouchdbFind)
+      pluginLoaded = true
+    }
+    this._dbs[doctype] = this._dbs[doctype] || {}
+    let offline = this._dbs[doctype]
+    if (offline && offline.database) { return offline.database }
+    offline.database = new PouchDB(doctype, options)
+    offline.timer = timer
+    offline.autoSync = null
+    if (timer) { this.startSync(doctype, timer) }
+    createIndexes(this.cozy, offline.database, doctype)
+    return offline.database
   }
-  return
-}
 
-export function destroyDatabase (cozy, doctype) {
-  if (hasDatabase(cozy, doctype)) {
-    stopSync(cozy, doctype)
-    getDatabase(cozy, doctype).destroy()
-    delete getDatabase(cozy, doctype)
+  hasDatabase (doctype) {
+    return doctype in this._dbs &&
+      this._dbs[doctype].database !== undefined
   }
-}
 
-export function getDoctypes (cozy) {
-  if (cozy._offline === null) { return [] }
-  return Object.keys(cozy._offline)
-}
+  getDatabase (doctype) {
+    if (this.hasDatabase(doctype)) {
+      return this._dbs[doctype].database
+    }
+    return
+  }
 
-//
-// SYNC
-//
+  destroyDatabase (doctype) {
+    if (this.hasDatabase(doctype)) {
+      this.stopSync(doctype)
+      this.getDatabase(doctype).destroy()
+    }
+  }
 
-export function startAllSync (cozy, timer) {
-  if (timer) {
-    const doctypes = getDoctypes(cozy)
+  getDoctypes () {
+    if (this._dbs === null) { return [] }
+    return Object.keys(this._dbs)
+  }
+
+  //
+  // SYNC
+  //
+
+  startAllSync (timer) {
+    if (timer) {
+      const doctypes = this.getDoctypes()
+      doctypes.forEach((doctype) => {
+        this.startSync(doctype, timer)
+      })
+    }
+  }
+
+  stopAllSync () {
+    const doctypes = this.getDoctypes()
     doctypes.forEach((doctype) => {
-      startSync(cozy, doctype, timer)
+      this.stopSync(doctype)
     })
   }
-}
 
-export function stopAllSync (cozy) {
-  const doctypes = getDoctypes(cozy)
-  doctypes.forEach((doctype) => {
-    stopSync(cozy, doctype)
-  })
-}
-
-export function startSync (cozy, doctype, timer) {
-  // TODO: add timer limitation for not flooding Gozy
-  if (hasDatabase(cozy, doctype)) {
-    if (hasSync(cozy, doctype)) {
-      if (timer === cozy._offline[doctype].timer) { return }
-      stopSync(cozy, doctype)
-    }
-    let offline = cozy._offline[doctype]
-    offline.timer = timer
-    offline.autoSync = setInterval(() => {
-      if (offline.replicate === undefined) {
-        offline.replicate = replicateFromCozy(cozy, doctype)
-          .on('complete', (info) => {
-            delete offline.replicate
-          })
-        // TODO: add replicationToCozy
+  startSync (doctype, timer) {
+    // TODO: add timer limitation for not flooding Gozy
+    if (this.hasDatabase(doctype)) {
+      if (this.hasSync(doctype)) {
+        if (timer === this._dbs[doctype].timer) { return }
+        this.stopSync(doctype)
       }
-    }, timer * 1000)
-  }
-}
-
-export function hasSync (cozy, doctype) {
-  return cozy._offline !== null &&
-    doctype in cozy._offline &&
-    cozy._offline[doctype].autoSync !== null
-}
-
-export function stopSync (cozy, doctype) {
-  if (hasSync(cozy, doctype)) {
-    let offline = cozy._offline[doctype]
-    if (offline.replication) { offline.replication.cancel() }
-    clearInterval(offline.autoSync)
-    delete offline.autoSync
-  }
-}
-
-export function replicateFromCozy (cozy, doctype, options = {}, events = {}) {
-  if (hasDatabase(cozy, doctype)) {
-    if (options.live === true) {
-      throw new Error('You can\'t use `live` option with Cozy couchdb.')
+      let offline = this._dbs[doctype]
+      offline.timer = timer
+      offline.autoSync = setInterval(() => {
+        if (offline.replicate === undefined) {
+          offline.replicate = this.replicateFromCozy(doctype)
+            .on('complete', (info) => {
+              delete offline.replicate
+            })
+          // TODO: add replicationToCozy
+        }
+      }, timer * 1000)
     }
-    const url = cozy._url + '/data/' + doctype
-    let db = getDatabase(cozy, doctype)
-    let replication = db.replicate.from(url, options)
-    const eventNames = [
-      'change', 'paused', 'active', 'denied', 'complete', 'error'
-    ]
-    for (let eventName of eventNames) {
-      if (typeof events[eventName] === 'function') {
-        replication.on(eventName, events[eventName])
+  }
+
+  hasSync (doctype) {
+    return this._dbs !== null &&
+      doctype in this._dbs &&
+      this._dbs[doctype].autoSync !== null
+  }
+
+  stopSync (doctype) {
+    if (this.hasSync(doctype)) {
+      let offline = this._dbs[doctype]
+      if (offline.replication) { offline.replication.cancel() }
+      clearInterval(offline.autoSync)
+      delete offline.autoSync
+    }
+  }
+
+  replicateFromCozy (doctype, options = {}, events = {}) {
+    if (this.hasDatabase(doctype)) {
+      if (options.live === true) {
+        throw new Error('You can\'t use `live` option with Cozy couchdb.')
       }
+      const url = this.cozy._url + '/data/' + doctype
+      let db = this.getDatabase(doctype)
+      let replication = db.replicate.from(url, options)
+      const eventNames = [
+        'change', 'paused', 'active', 'denied', 'complete', 'error'
+      ]
+      for (let eventName of eventNames) {
+        if (typeof events[eventName] === 'function') {
+          replication.on(eventName, events[eventName])
+        }
+      }
+      return replication
+    } else {
+      throw new Error(`You should add this doctype: ${doctype} to offline.`)
     }
-    return replication
-  } else {
-    throw new Error(`You should add this doctype: ${doctype} to offline.`)
   }
+
 }
 
 function createIndexes (cozy, db, doctype) {

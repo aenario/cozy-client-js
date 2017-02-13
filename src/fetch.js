@@ -1,17 +1,20 @@
 /* global fetch */
-import {refreshToken, AccessToken} from './auth_v3'
+import {refreshToken, AccessToken} from './auth/auth_v3'
 import {retry} from './utils'
 import jsonapi from './jsonapi'
 
 export function cozyFetch (cozy, path, options = {}) {
-  return cozy.fullpath(path).then((fullpath) => {
+  return cozy.isV2().then((isV2) => {
+    const pathprefix = isV2 ? '/ds-api' : ''
+    return cozy._url + pathprefix + path
+  }).then((fullpath) => {
     let resp
     if (options.disableAuth) {
       resp = fetch(fullpath, options)
     } else if (options.manualAuthCredentials) {
       resp = cozyFetchWithAuth(cozy, fullpath, options, options.manualAuthCredentials)
     } else {
-      resp = cozy.authorize().then((credentials) =>
+      resp = cozy.auth.authorize().then((credentials) =>
         cozyFetchWithAuth(cozy, fullpath, options, credentials))
     }
     return resp.then(handleResponse)

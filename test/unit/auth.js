@@ -3,7 +3,7 @@
 // eslint-disable-next-line no-unused-vars
 import should from 'should'
 import {Cozy, MemoryStorage} from '../../src'
-import {oauthFlow, AccessToken} from '../../src/auth_v3'
+import {oauthFlow, AccessToken} from '../../src/auth/auth_v3'
 import mock from '../mock-api'
 import {decodeQuery} from '../../src/utils'
 
@@ -11,6 +11,7 @@ describe('Authentication', function () {
   let cozy
 
   beforeEach(() => {
+    mock.mockAPI('Status')()
     cozy = new Cozy({
       cozyURL: 'http://foobar/',
       token: 'apptoken'

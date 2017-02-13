@@ -9,6 +9,7 @@ describe('Files', function () {
   let cozy
 
   beforeEach(() => {
+    mock.mockAPI('Status')()
     cozy = new Cozy({
       cozyURL: 'http://my.cozy.io///',
       token: 'apptoken'

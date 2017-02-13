@@ -5,7 +5,7 @@ import { DOCTYPE_FILES } from './doctypes'
 
 const contentTypeOctetStream = 'application/octet-stream'
 
-export class FilesAPI {
+export default class FilesAPI {
 
   constructor (cozy) {
     this.cozy = cozy

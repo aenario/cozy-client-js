@@ -117,6 +117,36 @@ export function decodeQuery (url) {
   return queries
 }
 
+export function removeTrailingSlash (url) {
+  while (url[url.length - 1] === '/') url = url.slice(0, -1)
+  return url
+}
+
+function protoify (context, fn) {
+  return function prototyped (...args) {
+    return fn(context, ...args)
+  }
+}
+
+export function addToProto (ctx, obj, proto, disablePromises) {
+  for (const attr in proto) {
+    let fn = protoify(ctx, proto[attr])
+    if (disablePromises) {
+      fn = unpromiser(fn)
+    }
+    obj[attr] = fn
+  }
+}
+
+export function unpromiseAllMethods (instance) {
+  for (const attr in instance.prototype) {
+    const fn = instance.prototype[attr]
+    if ((typeof fn) === 'function') {
+      instance[attr] = unpromiser(fn)
+    }
+  }
+}
+
 const warned = []
 export function warn (text) {
   if (warned.indexOf(text) === -1) {
